@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EmoteDrop — Drop Your Vibe on Solana</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<!-- Buffer polyfill — required by @solana/web3.js serialize() in browser -->
+<script src="https://bundle.run/buffer@6.0.3"></script>
+<script>window.Buffer = window.Buffer || buffer.Buffer;</script>
+<!-- Solana Web3.js -->
+<script src="https://unpkg.com/@solana/web3.js@1.95.4/lib/index.iife.min.js"></script>
+<!-- Gun.js — decentralized real-time DB, no backend needed -->
+<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+<style>
+:root {
+  --butter:#fff2bd; --butter-dark:#f5e68a; --butter-light:#fffadf;
+  --blue:#285ccc; --blue-dark:#1a3e99; --blue-light:#4a7de0;
+  --blue-pale:#dce8ff; --blue-xpale:#eef3ff;
+  --text:#0f1f4a; --text-soft:#4a5c8a; --text-muted:#8a9ab8;
+  --white:#ffffff; --green:#1a9e6a; --green-pale:#d4f5e8;
+  --red:#d43a3a; --red-pale:#fde8e8;
+  --gold:#cc8a00; --gold-pale:#fff0c2;
+  --shadow-sm:0 1px 4px rgba(40,92,204,.08);
+  --shadow:0 4px 16px rgba(40,92,204,.12);
+  --shadow-lg:0 8px 32px rgba(40,92,204,.18);
+  --r:12px; --r-lg:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--butter);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(circle at 15% 20%,rgba(40,92,204,.06) 0%,transparent 50%),
+  radial-gradient(circle at 85% 80%,rgba(40,92,204,.08) 0%,transparent 50%);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
+  display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;
+  background:rgba(255,250,223,.93);backdrop-filter:blur(20px);
+  border-bottom:2px solid var(--blue);box-shadow:var(--shadow-sm);}
+.logo{font-size:1.15rem;font-weight:800;color:var(--blue);display:flex;align-items:center;gap:.45rem;letter-spacing:-.5px;}
+.nav-mid{display:flex;align-items:center;gap:.3rem;}
+.nav-link{padding:.35rem .85rem;border-radius:50px;border:none;background:transparent;cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.8rem;font-weight:600;color:var(--text-soft);transition:all .18s;}
+.nav-link:hover{background:var(--blue-xpale);color:var(--blue);}
+.nav-right{display:flex;align-items:center;gap:.6rem;}
+.btn-connect{display:flex;align-items:center;gap:.4rem;padding:.45rem 1.1rem;
+  background:var(--blue);border:none;border-radius:50px;cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.78rem;font-weight:700;color:var(--white);
+  transition:all .2s;box-shadow:var(--shadow-sm);}
+.btn-connect:hover{background:var(--blue-dark);transform:translateY(-1px);box-shadow:var(--shadow);}
+.wallet-chip{display:flex;align-items:center;gap:.45rem;padding:.38rem .9rem;
+  background:var(--green-pale);border:1.5px solid var(--green);
+  border-radius:50px;font-size:.75rem;font-weight:700;color:var(--green);}
+.chip-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pdot 2s infinite;}
+@keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(26,158,106,.4)}50%{opacity:.8;box-shadow:0 0 0 4px rgba(26,158,106,0)}}
+.btn-add{display:flex;align-items:center;gap:.4rem;padding:.45rem 1.1rem;
+  background:var(--butter-dark);border:2px solid var(--blue);border-radius:50px;cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.78rem;font-weight:700;color:var(--blue);transition:all .2s;}
+.btn-add:hover{background:var(--blue);color:var(--white);}
+
+/* DEVNET BANNER */
+.devnet-banner{position:fixed;top:58px;left:0;right:0;z-index:150;
+  background:var(--blue);color:var(--butter);
+  text-align:center;font-size:.72rem;font-weight:600;padding:.3rem 1rem;letter-spacing:.5px;}
+.devnet-banner a{color:var(--butter-dark);text-decoration:underline;}
+
+/* TOP EMOTES BAR */
+.top-bar{position:sticky;top:82px;z-index:90;
+  display:flex;align-items:center;gap:.6rem;padding:.55rem 1.5rem;
+  background:rgba(255,250,223,.95);backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(40,92,204,.1);flex-wrap:wrap;}
+.top-bar-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:1.2px;color:var(--text-muted);white-space:nowrap;}
+#topEmotes{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;}
+.te-item{display:flex;align-items:center;gap:.25rem;padding:.2rem .55rem;
+  background:var(--white);border:1.5px solid var(--blue-pale);border-radius:50px;}
+.te-em{font-size:.95rem;}
+.te-cnt{font-size:.6rem;font-weight:800;color:var(--blue);}
+.te-empty{font-size:.7rem;color:var(--text-muted);font-style:italic;}
+
+/* PAGE */
+.page{position:relative;z-index:1;padding-top:82px;padding-bottom:60px;min-height:100vh;}
+
+/* SECTION LABELS */
+.sec-label{display:flex;align-items:center;gap:.6rem;padding:.65rem 1.5rem;
+  font-size:.7rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  position:sticky;top:115px;z-index:50;
+  background:rgba(255,250,223,.93);backdrop-filter:blur(12px);
+  border-bottom:1.5px solid rgba(40,92,204,.1);}
+.sl-boost{color:var(--gold);border-top:2px solid rgba(204,138,0,.18);}
+.sl-normal{color:var(--text-muted);border-top:2px solid rgba(40,92,204,.07);}
+.sldot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.sl-boost .sldot{background:var(--gold);box-shadow:0 0 6px var(--gold);animation:pdot 2s infinite;}
+.sl-normal .sldot{background:var(--text-muted);}
+.sl-right{margin-left:auto;display:flex;align-items:center;gap:.5rem;}
+.sl-cnt{font-size:.65rem;font-weight:600;opacity:.6;}
+
+/* WALL — bigger */
+.wall{display:flex;flex-wrap:wrap;gap:14px;padding:1.2rem 1.5rem;min-height:100px;}
+.wall-empty{width:100%;padding:1.5rem 0;font-size:.82rem;color:var(--text-muted);font-style:italic;}
+
+/* EMOTE CARD — 118×118px */
+.ecard{position:relative;width:118px;height:118px;border-radius:var(--r);
+  overflow:hidden;flex-shrink:0;cursor:default;
+  animation:cardPop .35s cubic-bezier(.34,1.56,.64,1);
+  transition:transform .18s,box-shadow .18s;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+@keyframes cardPop{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+.ecard:hover{transform:translateY(-3px) scale(1.04);z-index:10;}
+.ecard-n{background:var(--white);border:2px solid rgba(40,92,204,.15);box-shadow:var(--shadow-sm);}
+.ecard-n:hover{border-color:var(--blue);box-shadow:var(--shadow);}
+.ecard-b{background:linear-gradient(145deg,#fffbe6,#fff0c2);border:2px solid var(--gold);
+  box-shadow:0 4px 16px rgba(204,138,0,.18),var(--shadow-sm);}
+.ecard-b:hover{box-shadow:0 6px 22px rgba(204,138,0,.32);}
+
+/* EMOJI — big */
+.ecard-emoji{font-size:3.2rem;line-height:1;display:block;text-align:center;}
+
+/* BOOST BADGE */
+.boost-badge{position:absolute;top:5px;right:6px;font-size:.5rem;font-weight:800;
+  background:var(--gold);color:#fff;padding:2px 5px;border-radius:4px;
+  letter-spacing:.5px;text-transform:uppercase;}
+
+/* HANDLE — bigger */
+.card-handle{font-size:.72rem;font-weight:800;color:var(--blue);margin-top:4px;
+  max-width:106px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-align:center;letter-spacing:-.1px;}
+
+/* TIMER */
+.card-timer{font-size:.52rem;font-weight:700;color:var(--text-muted);margin-top:2px;letter-spacing:.2px;}
+.card-timer.boost-t{color:var(--gold);}
+.card-timer.expiring{color:var(--red);animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* HOVER OVERLAY */
+.card-overlay{position:absolute;inset:0;background:rgba(40,92,204,.87);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;opacity:0;transition:opacity .18s;border-radius:calc(var(--r) - 2px);}
+.ecard:hover .card-overlay{opacity:1;}
+.ov-handle{font-size:.65rem;font-weight:800;color:rgba(255,255,255,.85);margin-bottom:2px;}
+.btn-tip-ov{padding:6px 16px;background:var(--white);border:none;border-radius:50px;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.68rem;font-weight:800;color:var(--blue);
+  cursor:pointer;transition:all .15s;width:80px;}
+.btn-tip-ov:hover{background:var(--butter);transform:scale(1.05);}
+.btn-boost-ov{padding:5px 12px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.45);
+  border-radius:50px;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.6rem;font-weight:700;color:var(--white);cursor:pointer;transition:all .15s;width:80px;}
+.btn-boost-ov:hover{background:rgba(255,255,255,.32);}
+
+/* STATS BAR */
+.stats-bar{position:fixed;bottom:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;gap:1.2rem;padding:.48rem 1.5rem;
+  background:rgba(255,250,223,.95);backdrop-filter:blur(16px);
+  border-top:2px solid var(--blue);font-size:.7rem;font-weight:600;color:var(--text-soft);}
+.sb-it{display:flex;align-items:center;gap:.35rem;}
+.sb-val{font-weight:800;color:var(--blue);}
+.sb-live{margin-left:auto;display:flex;align-items:center;gap:.4rem;font-size:.65rem;font-weight:700;color:var(--green);letter-spacing:1px;}
+.sb-ld{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pdot 1.5s infinite;}
+.sb-price{font-size:.65rem;color:var(--text-muted);}
+
+/* OVERLAYS */
+.overlay{position:fixed;inset:0;z-index:600;background:rgba(15,31,74,.48);
+  backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:1rem;}
+.overlay.show{display:flex;}
+.modal{background:var(--white);border:2px solid var(--blue);border-radius:var(--r-lg);
+  padding:1.8rem;width:100%;max-width:400px;box-shadow:var(--shadow-lg);
+  animation:mPop .3s cubic-bezier(.34,1.56,.64,1);max-height:90vh;overflow-y:auto;}
+@keyframes mPop{from{opacity:0;transform:scale(.88) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-hd{font-size:1.05rem;font-weight:800;color:var(--blue);margin-bottom:1.2rem;text-align:center;}
+.modal-sub{font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:-.8rem;margin-bottom:1.1rem;}
+
+/* PROGRESS DOTS */
+.prog{display:flex;justify-content:center;gap:6px;margin-bottom:1.2rem;}
+.pd{width:32px;height:4px;border-radius:2px;background:var(--blue-pale);transition:all .3s;}
+.pd.on{background:var(--blue);}
+
+/* WALLET OPTIONS */
+.w-list{display:flex;flex-direction:column;gap:.5rem;}
+.w-opt{display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;
+  background:var(--butter-light);border:1.5px solid var(--blue-pale);
+  border-radius:var(--r);cursor:pointer;font-size:.85rem;font-weight:600;color:var(--text);
+  transition:all .2s;}
+.w-opt:hover{border-color:var(--blue);background:var(--blue-xpale);transform:translateX(3px);}
+.w-ico{font-size:1.4rem;width:30px;text-align:center;}
+.w-sub{font-size:.63rem;color:var(--text-muted);font-weight:400;margin-top:1px;}
+
+/* EMOTE GRID */
+.eg{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem;margin-bottom:1.1rem;}
+.eg-b{aspect-ratio:1;background:var(--butter-light);border:1.5px solid var(--blue-pale);
+  border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:1.35rem;transition:all .18s;}
+.eg-b:hover{border-color:var(--blue);background:var(--blue-xpale);transform:scale(1.08);}
+.eg-b.on{border-color:var(--blue);background:var(--blue-pale);box-shadow:0 0 0 2px var(--blue);}
+
+/* TYPE CARDS */
+.type-row{display:flex;gap:.6rem;margin-bottom:1.1rem;}
+.tc{flex:1;padding:1rem .7rem;text-align:center;background:var(--butter-light);
+  border:1.5px solid var(--blue-pale);border-radius:var(--r);cursor:pointer;transition:all .2s;}
+.tc:hover{border-color:var(--blue);}
+.tc.sel-n{border-color:var(--blue);background:var(--blue-xpale);box-shadow:0 0 0 2px var(--blue-pale);}
+.tc.sel-b{border-color:var(--gold);background:var(--gold-pale);box-shadow:0 0 0 2px rgba(204,138,0,.2);}
+.tc-ico{font-size:1.6rem;margin-bottom:5px;}
+.tc-t{font-size:.82rem;font-weight:700;margin-bottom:3px;}
+.tc-s{font-size:.62rem;color:var(--text-muted);line-height:1.5;}
+.tc-p{font-size:.78rem;font-weight:800;color:var(--gold);margin-top:5px;}
+.tc-usd{font-size:.6rem;color:var(--text-muted);}
+
+/* PREV PILL */
+.prev-pill{display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;
+  background:var(--butter-light);border:1.5px solid var(--blue-pale);
+  border-radius:var(--r);margin-bottom:1rem;}
+.pp-e{font-size:1.4rem;}
+.pp-n{font-size:.82rem;font-weight:700;color:var(--blue);}
+.pp-s{font-size:.62rem;color:var(--text-muted);}
+
+/* FORM INPUTS */
+.flbl{font-size:.68rem;color:var(--text-soft);font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;margin-bottom:.4rem;display:block;}
+.input-wrap{position:relative;margin-bottom:1rem;}
+.input-at{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);
+  font-weight:700;color:var(--text-muted);pointer-events:none;}
+.finp{width:100%;padding:.75rem .9rem;padding-left:1.8rem;
+  background:var(--butter-light);border:1.5px solid var(--blue-pale);
+  border-radius:var(--r);color:var(--text);
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.88rem;
+  outline:none;transition:border-color .2s;}
+.finp:focus{border-color:var(--blue);background:var(--white);}
+::placeholder{color:var(--text-muted);}
+
+/* COST BOX */
+.cost-box{display:flex;align-items:center;justify-content:space-between;
+  padding:.7rem .9rem;background:var(--blue-xpale);border:1.5px solid var(--blue-pale);
+  border-radius:var(--r);margin-bottom:1rem;font-size:.8rem;font-weight:600;color:var(--blue);}
+.cost-sol{font-size:.9rem;font-weight:800;}
+.cost-usd{font-size:.63rem;color:var(--text-muted);}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:.55rem;margin-top:.2rem;}
+.btn-primary{flex:1;padding:.78rem;background:var(--blue);border:none;border-radius:var(--r);
+  cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.83rem;font-weight:700;color:var(--white);transition:all .2s;}
+.btn-primary:hover{background:var(--blue-dark);transform:translateY(-1px);box-shadow:var(--shadow);}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-gold{flex:1;padding:.78rem;background:var(--gold);border:none;border-radius:var(--r);
+  cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.83rem;font-weight:700;color:var(--white);transition:all .2s;}
+.btn-gold:hover{background:#b07800;transform:translateY(-1px);box-shadow:0 4px 16px rgba(204,138,0,.3);}
+.btn-gold:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.btn-ghost{padding:.78rem 1rem;background:transparent;border:1.5px solid var(--blue-pale);
+  border-radius:var(--r);cursor:pointer;color:var(--text-muted);
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.8rem;font-weight:600;transition:all .2s;}
+.btn-ghost:hover{border-color:var(--blue);color:var(--blue);}
+.btn-cancel{margin-top:.7rem;width:100%;padding:.62rem;background:transparent;
+  border:1.5px solid var(--blue-pale);border-radius:var(--r);cursor:pointer;color:var(--text-muted);
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.78rem;font-weight:600;transition:all .2s;}
+.btn-cancel:hover{border-color:var(--red);color:var(--red);}
+
+/* TX STATUS */
+.tx-status{padding:.7rem;border-radius:var(--r);margin-bottom:.8rem;
+  font-size:.78rem;font-weight:600;text-align:center;display:none;}
+.tx-pending{background:var(--blue-pale);color:var(--blue);display:block;}
+.tx-ok{background:var(--green-pale);color:var(--green);display:block;}
+.tx-err{background:var(--red-pale);color:var(--red);display:block;}
+.tx-link{font-size:.65rem;display:block;margin-top:3px;text-decoration:underline;}
+
+/* TIP GRID */
+.tip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin:.9rem 0;}
+.tip-o{padding:.65rem .3rem;background:var(--butter-light);border:1.5px solid var(--blue-pale);
+  border-radius:var(--r);cursor:pointer;text-align:center;transition:all .18s;}
+.tip-o:hover,.tip-o.on{border-color:var(--blue);background:var(--blue-pale);}
+.tip-sol{font-size:.88rem;font-weight:800;color:var(--blue);}
+.tip-usd{font-size:.58rem;color:var(--text-muted);}
+
+/* ABOUT */
+.about-icon{text-align:center;font-size:2.5rem;margin-bottom:.8rem;}
+.about-tagline{text-align:center;font-size:.9rem;color:var(--text-soft);margin-bottom:1.2rem;line-height:1.5;}
+.af-list{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.2rem;}
+.af{display:flex;align-items:flex-start;gap:.7rem;padding:.6rem .8rem;
+  background:var(--butter-light);border:1px solid var(--blue-pale);
+  border-radius:var(--r);font-size:.78rem;color:var(--text-soft);line-height:1.5;}
+.af-ico{font-size:1rem;flex-shrink:0;}
+
+/* NOTIF */
+.notif{position:fixed;bottom:4.2rem;right:1.2rem;z-index:999;
+  padding:.6rem 1rem;background:var(--white);border:2px solid var(--blue);
+  border-radius:var(--r);font-size:.78rem;font-weight:700;color:var(--blue);
+  box-shadow:var(--shadow);animation:nIn .28s ease;max-width:320px;}
+.notif.err{border-color:var(--red);color:var(--red);}
+.notif.ok{border-color:var(--green);color:var(--green);}
+@keyframes nIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.spin{display:inline-block;width:13px;height:13px;
+  border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+  border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--butter-light);}
+::-webkit-scrollbar-thumb{background:var(--blue-pale);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo"><span>😊</span> EmoteDrop</div>
+  <div class="nav-mid">
+    <button class="nav-link" onclick="openAbout()">About</button>
+  </div>
+  <div class="nav-right">
+    <div id="wDisplay" style="display:none"></div>
+    <button class="btn-connect" id="cBtn" onclick="openWalletModal()">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <rect x="1" y="6" width="22" height="14" rx="2"/>
+        <path d="M16 14a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/>
+      </svg>
+      Connect Wallet
+    </button>
+    <button class="btn-add" id="aBtn" style="display:none" onclick="openForm()">+ Drop Emote</button>
+  </div>
+</nav>
+
+<!-- DEVNET BANNER -->
+<div class="devnet-banner">
+  🔧 Running on Solana <strong>Devnet</strong> — Get free test SOL at
+  <a href="https://faucet.solana.com" target="_blank">faucet.solana.com</a>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- TOP EMOTES BAR -->
+  <div class="top-bar">
+    <span class="top-bar-lbl">🔥 Trending</span>
+    <div id="topEmotes"><span class="te-empty">No drops yet</span></div>
+  </div>
+
+  <!-- BOOST SECTION -->
+  <div class="sec-label sl-boost">
+    <span class="sldot"></span>
+    ⚡ Boosted — Pinned to Top
+    <div class="sl-right"><span class="sl-cnt" id="bCnt">0 active</span></div>
+  </div>
+  <div class="wall" id="boostWall">
+    <div class="wall-empty" id="bEmpty">No boosted emotes yet</div>
+  </div>
+
+  <!-- NORMAL SECTION -->
+  <div class="sec-label sl-normal">
+    <span class="sldot"></span>
+    ✨ Live Emote Wall
+    <div class="sl-right"><span class="sl-cnt" id="nCnt">0 drops</span></div>
+  </div>
+  <div class="wall" id="normalWall">
+    <div class="wall-empty" id="nEmpty">Be the first to drop an emote!</div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="sb-it">✦ <span class="sb-val" id="sTot">0</span> drops</div>
+  <div class="sb-it">⚡ <span class="sb-val" id="sB">0</span> boosted</div>
+  <div class="sb-it">◎ <span class="sb-val" id="sSOL">0.0000</span> SOL</div>
+  <div class="sb-it" id="priceBar" style="display:none">
+    <span class="sb-price">1 SOL = $<span id="solPriceVal">—</span></span>
+  </div>
+  <div class="sb-live"><div class="sb-ld"></div>LIVE · DEVNET</div>
+</div>
+
+<!-- ══ WALLET MODAL ══ -->
+<div class="overlay" id="walletOv">
+  <div class="modal">
+    <div class="modal-hd">Connect Wallet</div>
+    <div class="modal-sub">Solana Devnet</div>
+    <div class="w-list">
+      <div class="w-opt" onclick="connectWallet('phantom')">
+        <div class="w-ico">👻</div>
+        <div><div>Phantom</div><div class="w-sub">phantom.app — most popular</div></div>
+      </div>
+      <div class="w-opt" onclick="connectWallet('solflare')">
+        <div class="w-ico">🌟</div>
+        <div><div>Solflare</div><div class="w-sub">solflare.com</div></div>
+      </div>
+      <div class="w-opt" onclick="connectWallet('backpack')">
+        <div class="w-ico">🎒</div>
+        <div><div>Backpack</div><div class="w-sub">backpack.app</div></div>
+      </div>
+    </div>
+    <button class="btn-cancel" onclick="closeOv('walletOv')">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ DROP FORM MODAL ══ -->
+<div class="overlay" id="formOv">
+  <div class="modal">
+    <div class="prog">
+      <div class="pd on" id="d1"></div>
+      <div class="pd" id="d2"></div>
+      <div class="pd" id="d3"></div>
+    </div>
+
+    <!-- Step 1: mood -->
+    <div id="s1">
+      <div class="modal-hd">Pick Your Mood</div>
+      <div class="eg" id="egrid"></div>
+      <div class="btn-row">
+        <button class="btn-ghost" onclick="closeOv('formOv')">Cancel</button>
+        <button class="btn-primary" id="s1next" onclick="toStep(2)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: type -->
+    <div id="s2" style="display:none">
+      <div class="modal-hd">Post Type</div>
+      <div class="prev-pill" id="s2prev"></div>
+      <div class="type-row">
+        <div class="tc sel-n" id="tcN" onclick="pickType('n')">
+          <div class="tc-ico">✨</div>
+          <div class="tc-t">Normal</div>
+          <div class="tc-s">Lives 24 hours<br/>Boost anytime</div>
+          <div class="tc-p" id="normalSolLbl">≈ 0.001 SOL</div>
+          <div class="tc-usd">~$0.10</div>
+        </div>
+        <div class="tc" id="tcB" onclick="pickType('b')">
+          <div class="tc-ico">⚡</div>
+          <div class="tc-t">Boost</div>
+          <div class="tc-s">Pinned top 6h<br/>+ 24h life</div>
+          <div class="tc-p" id="boostSolLbl">≈ 0.101 SOL</div>
+          <div class="tc-usd">~$0.10 + 0.1 SOL</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-ghost" onclick="toStep(1)">← Back</button>
+        <button class="btn-primary" onclick="toStep(3)">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: handle + pay -->
+    <div id="s3" style="display:none">
+      <div class="modal-hd">Almost There!</div>
+      <div class="prev-pill" id="s3prev"></div>
+      <label class="flbl">X (Twitter) Handle</label>
+      <div class="input-wrap">
+        <span class="input-at">@</span>
+        <input class="finp" id="handleI" type="text" placeholder="yourhandle" maxlength="30"
+               oninput="this.value=this.value.replace(/[^a-zA-Z0-9_]/g,'')"/>
+      </div>
+      <div class="cost-box" id="costBox">
+        <div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:2px">Total Cost</div>
+          <div class="cost-sol" id="costSol">— SOL</div>
+          <div class="cost-usd" id="costUsd">calculating...</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.6rem;color:var(--text-muted)">Network</div>
+          <div style="font-weight:700;font-size:.78rem;color:var(--blue)">Devnet</div>
+        </div>
+      </div>
+      <div class="tx-status" id="txStatus"></div>
+      <div class="btn-row" id="s3row"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TIP MODAL ══ -->
+<div class="overlay" id="tipOv">
+  <div class="modal">
+    <div class="modal-hd">💙 Send a Tip</div>
+    <div class="modal-sub">Tip goes directly to <span id="tipTo" style="color:var(--blue);font-weight:800"></span></div>
+    <div class="tip-grid">
+      <div class="tip-o" onclick="pickTip(this,'0.001')"><div class="tip-sol">0.001</div><div class="tip-usd">~$0.10</div></div>
+      <div class="tip-o on" onclick="pickTip(this,'0.005')"><div class="tip-sol">0.005</div><div class="tip-usd">~$0.50</div></div>
+      <div class="tip-o" onclick="pickTip(this,'0.01')"><div class="tip-sol">0.01</div><div class="tip-usd">~$1.00</div></div>
+      <div class="tip-o" onclick="pickTip(this,'0.05')"><div class="tip-sol">0.05</div><div class="tip-usd">~$5.00</div></div>
+      <div class="tip-o" onclick="pickTip(this,'0.1')"><div class="tip-sol">0.1</div><div class="tip-usd">~$10</div></div>
+      <div class="tip-o" onclick="pickTip(this,'0.5')"><div class="tip-sol">0.5</div><div class="tip-usd">~$50</div></div>
+    </div>
+    <div class="tx-status" id="tipTxSt"></div>
+    <button class="btn-primary" id="tipSendBtn" onclick="sendTip()" style="width:100%;margin-bottom:.6rem">Send Tip 💙</button>
+    <button class="btn-cancel" onclick="closeOv('tipOv')">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ ABOUT MODAL ══ -->
+<div class="overlay" id="aboutOv">
+  <div class="modal" style="max-width:440px">
+    <div class="about-icon">😊</div>
+    <div class="modal-hd">About EmoteDrop</div>
+    <div class="about-tagline">Drop your vibe on Solana.<br/>Tip who resonates. Boost to the top.</div>
+    <div class="af-list">
+      <div class="af"><span class="af-ico">🎭</span><span>Choose from 35+ mood emotes and drop your feeling on the live wall. Each drop lives for <strong>24 hours</strong>.</span></div>
+      <div class="af"><span class="af-ico">⚡</span><span>Boost pins your emote to the top for <strong>6 hours</strong> at a fixed <strong>0.1 SOL</strong>. After that it moves to the normal wall.</span></div>
+      <div class="af"><span class="af-ico">💙</span><span>Tips go <strong>directly</strong> to the creator's Solana wallet — real on-chain transfer, no middleman.</span></div>
+      <div class="af"><span class="af-ico">🔗</span><span>Link your X (Twitter) handle so the community knows who dropped the vibe.</span></div>
+      <div class="af"><span class="af-ico">◎</span><span>Drop cost is <strong>~$0.10</strong> in SOL (calculated live from CoinGecko). Boost costs an extra <strong>0.1 SOL</strong> flat.</span></div>
+    </div>
+    <button class="btn-primary" onclick="closeOv('aboutOv')" style="width:100%">Got It!</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// CONFIG — edit DEV_WALLET to your Solana address
+// ════════════════════════════════════════════════════════════════
+const CONFIG = {
+  RPC_URL:          'https://api.devnet.solana.com',
+  DEV_WALLET:       '56kBa5NZX1NGYtjbXVeLLGvdczs1mKsmWtYrLq8dkeoi',
+  DROP_USD:          0.10,
+  BOOST_SOL_FLAT:    0.1,        // fixed 0.1 SOL for boost
+  DROP_LIFETIME_MS:  24*60*60*1000,
+  BOOST_DURATION_MS:  6*60*60*1000,
+};
+
+// ════════════════════════════════════════════════════════════════
+// SOLANA SETUP
+// ════════════════════════════════════════════════════════════════
+const connection = new solanaWeb3.Connection(CONFIG.RPC_URL, 'confirmed');
+let DEV_PUBKEY = null;
+try { DEV_PUBKEY = new solanaWeb3.PublicKey(CONFIG.DEV_WALLET); } catch(e) { console.error('Bad DEV_WALLET:', e); }
+
+// ════════════════════════════════════════════════════════════════
+// SOL PRICE — drop cost is ~$0.10 in SOL; boost is 0.1 SOL flat
+// ════════════════════════════════════════════════════════════════
+let solPriceUSD = 150;
+let dropSOL     = +(CONFIG.DROP_USD / solPriceUSD).toFixed(6);
+const boostSOL  = CONFIG.BOOST_SOL_FLAT;  // always 0.1 SOL
+
+async function fetchSolPrice() {
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+    const d = await r.json();
+    if (d?.solana?.usd) {
+      solPriceUSD = d.solana.usd;
+      dropSOL = +(CONFIG.DROP_USD / solPriceUSD).toFixed(6);
+      document.getElementById('solPriceVal').textContent = solPriceUSD.toFixed(2);
+      document.getElementById('priceBar').style.display = 'flex';
+      document.getElementById('normalSolLbl').textContent = `≈ ${dropSOL} SOL`;
+      document.getElementById('boostSolLbl').textContent  = `≈ ${+(dropSOL + boostSOL).toFixed(4)} SOL`;
+    }
+  } catch(_) {}
+}
+fetchSolPrice();
+setInterval(fetchSolPrice, 60000);
+
+// ════════════════════════════════════════════════════════════════
+// MOODS — emotions / feelings only (35)
+// ════════════════════════════════════════════════════════════════
+const MOODS = [
+  '😊','😂','❤️','😍','😭','😎','🥳','😅','🤣','💯',
+  '🙏','😱','🥰','😢','😡','🤔','🫂','💀','😴','🤯',
+  '🥲','😤','🤩','😬','🫡','🥹','💪','💔','😻','🤗',
+  '😇','🥺','😆','😏','😌',
+];
+(function buildGrid() {
+  const g = document.getElementById('egrid');
+  MOODS.forEach(em => {
+    const b = document.createElement('button');
+    b.className = 'eg-b'; b.dataset.e = em; b.textContent = em;
+    b.onclick = () => pickMood(b);
+    g.appendChild(b);
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
+let walletPubkey = null;
+let selE = null, selT = 'n', selTip = '0.005', tipDrop = null;
+let drops = [], stats = { tot:0, b:0, sol:0 };
+setInterval(tickTimers, 10000);
+
+// ════════════════════════════════════════════════════════════════
+// GUN.JS — decentralized shared storage (no backend needed)
+// Drops disimpan di jaringan Gun peer-to-peer, bisa dibaca semua orang
+// ════════════════════════════════════════════════════════════════
+const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+const dropsDB = gun.get('emotedrop-v1').get('drops');
+
+// Dengarkan drops baru dari semua user
+dropsDB.map().on(function(data, key) {
+  if (!data || !data.id) return;
+  const now = Date.now();
+
+  // Buang yang sudah expired
+  if (data.expiresAt && now >= data.expiresAt) {
+    if (drops.find(d => d.id === key)) expireDrop(key);
+    return;
+  }
+
+  // Cek apakah sudah ada di lokal
+  const existing = drops.find(d => d.id === key);
+  if (existing) return; // sudah ada, skip
+
+  // Tambah ke lokal
+  const drop = { ...data, id: key };
+  drops.push(drop);
+  renderCard(drop);
+  stats.tot++;
+  if (drop.boosted) stats.b++;
+  stats.sol += drop.solPaid || 0;
+  document.getElementById(drop.boosted ? 'bEmpty' : 'nEmpty').style.display = 'none';
+  updateStats(); updateCounts(); updateTopEmotes();
+});
+
+function saveDrop(drop) {
+  dropsDB.get(String(drop.id)).put(drop);
+}
+
+function saveBoostUpdate(id, boostExpiresAt) {
+  dropsDB.get(String(id)).put({ boosted: true, boostExpiresAt });
+}
+
+// ════════════════════════════════════════════════════════════════
+// SEND TX — Buffer polyfill loaded above, so serialize() works fine.
+// Three paths: Phantom request API → signAndSendTransaction → signTransaction
+// ════════════════════════════════════════════════════════════════
+async function sendTx(prov, from, to, lamports) {
+  const tx = new solanaWeb3.Transaction();
+  tx.add(solanaWeb3.SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports }));
+
+  const latestBlock = await connection.getLatestBlockhash('finalized');
+  tx.recentBlockhash      = latestBlock.blockhash;
+  tx.feePayer             = from;
+
+  let sig;
+
+  try {
+    // ── Path 1: signAndSendTransaction (Phantom, Solflare native) ──
+    // Returns { signature: string } or just a string
+    if (typeof prov.signAndSendTransaction === 'function') {
+      const res = await prov.signAndSendTransaction(tx);
+      sig = (res && typeof res.signature === 'string') ? res.signature
+          : (typeof res === 'string') ? res
+          : null;
+    }
+
+    // ── Path 2: signTransaction + sendRawTransaction ──
+    // Buffer polyfill ensures serialize() works in browser
+    if (!sig && typeof prov.signTransaction === 'function') {
+      const signed   = await prov.signTransaction(tx);
+      const rawBytes = signed.serialize();        // works now — Buffer is polyfilled
+      sig = await connection.sendRawTransaction(rawBytes, {
+        skipPreflight:       false,
+        preflightCommitment: 'confirmed',
+      });
+    }
+
+    if (!sig) throw new Error('Wallet returned no signature. Please try again.');
+
+  } catch (e) {
+    // Re-throw wallet rejection cleanly
+    if (e.code === 4001 || /rejected|cancelled|denied/i.test(e.message || '')) {
+      throw new Error('Transaction rejected by wallet.');
+    }
+    throw e;
+  }
+
+  // ── Confirm via polling (more reliable than WS on devnet) ──
+  await waitForConfirmation(sig, latestBlock.lastValidBlockHeight);
+  return sig;
+}
+
+// Polling confirmation — avoids WebSocket timeout issues on devnet
+async function waitForConfirmation(sig, lastValidBlockHeight) {
+  const TIMEOUT_MS = 90000;
+  const start = Date.now();
+
+  while (Date.now() - start < TIMEOUT_MS) {
+    const status = await connection.getSignatureStatus(sig, { searchTransactionHistory: false });
+    const val    = status?.value;
+
+    if (val?.err) throw new Error('Transaction failed on-chain: ' + JSON.stringify(val.err));
+    if (val?.confirmationStatus === 'confirmed' || val?.confirmationStatus === 'finalized') return;
+
+    const blockHeight = await connection.getBlockHeight('confirmed');
+    if (blockHeight > lastValidBlockHeight) {
+      throw new Error('Transaction expired. Please try again.');
+    }
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  // Timeout — but tx might still land; show Explorer link anyway
+  throw new Error('Confirmation timeout — transaction may still succeed. Check Explorer.');
+}
+
+// ════════════════════════════════════════════════════════════════
+// WALLET CONNECT
+// ════════════════════════════════════════════════════════════════
+function openWalletModal() { document.getElementById('walletOv').classList.add('show'); }
+
+async function connectWallet(name) {
+  closeOv('walletOv');
+  const prov = getProvider(name);
+  if (!prov) {
+    const urls = { phantom:'https://phantom.app', solflare:'https://solflare.com', backpack:'https://backpack.app' };
+    notif(
+      `❌ ${cap(name)} not found — <a href="${urls[name]||'#'}" target="_blank" style="color:inherit;text-decoration:underline">install it here ↗</a>`,
+      'err'
+    );
+    return;
+  }
+  try {
+    notif('Connecting...');
+    const resp = await prov.connect();
+    walletPubkey = resp.publicKey;
+    const addr  = walletPubkey.toBase58();
+    document.getElementById('cBtn').style.display = 'none';
+    const wd = document.getElementById('wDisplay');
+    wd.style.display = 'flex';
+    wd.innerHTML = `<div class="wallet-chip"><div class="chip-dot"></div>${addr.slice(0,4)}...${addr.slice(-4)}</div>`;
+    document.getElementById('aBtn').style.display = 'flex';
+    notif(`${cap(name)} connected!`, 'ok');
+  } catch(e) {
+    notif('Connection rejected.', 'err');
+  }
+}
+
+function getProvider(n) {
+  if (n === 'phantom')  return window.phantom?.solana || (window.solana?.isPhantom ? window.solana : null);
+  if (n === 'solflare') return window.solflare || null;
+  if (n === 'backpack') return window.xnft?.solana || window.backpack || null;
+  return null;
+}
+function getActiveProv() {
+  return window.phantom?.solana
+      || window.solflare
+      || window.xnft?.solana
+      || (window.solana?.isPhantom ? window.solana : null)
+      || window.solana
+      || null;
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ════════════════════════════════════════════════════════════════
+// FORM FLOW
+// ════════════════════════════════════════════════════════════════
+function openForm() {
+  if (!walletPubkey) { openWalletModal(); return; }
+  selE = null; selT = 'n';
+  document.querySelectorAll('.eg-b').forEach(b => b.classList.remove('on'));
+  document.getElementById('s1next').disabled      = true;
+  document.getElementById('handleI').value        = '';
+  document.getElementById('txStatus').className   = 'tx-status';
+  document.getElementById('txStatus').innerHTML   = '';
+  pickType('n');
+  toStep(1);
+  document.getElementById('formOv').classList.add('show');
+}
+
+function pickMood(btn) {
+  document.querySelectorAll('.eg-b').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  selE = btn.dataset.e;
+  document.getElementById('s1next').disabled = false;
+}
+
+function pickType(t) {
+  selT = t;
+  document.getElementById('tcN').className = 'tc' + (t==='n' ? ' sel-n' : '');
+  document.getElementById('tcB').className = 'tc' + (t==='b' ? ' sel-b' : '');
+}
+
+function toStep(n) {
+  ['s1','s2','s3'].forEach((id,i) => document.getElementById(id).style.display = (i+1===n ? 'block' : 'none'));
+  ['d1','d2','d3'].forEach((id,i) => document.getElementById(id).classList.toggle('on', i+1<=n));
+
+  if (n === 2) {
+    document.getElementById('s2prev').innerHTML =
+      `<span class="pp-e">${selE}</span>
+       <div><div class="pp-n">Mood selected</div><div class="pp-s">Choose post type</div></div>`;
+  }
+  if (n === 3) {
+    const isBst = selT === 'b';
+    const sol   = isBst ? +(dropSOL + boostSOL).toFixed(6) : dropSOL;
+    document.getElementById('s3prev').innerHTML =
+      `<span class="pp-e">${selE}</span>
+       <div><div class="pp-n">${isBst ? '⚡ Boost' : '✨ Normal'}</div>
+       <div class="pp-s">${isBst ? 'Pinned 6h + 24h life' : 'Lives 24 hours'}</div></div>`;
+    document.getElementById('costSol').textContent = sol + ' SOL';
+    document.getElementById('costUsd').textContent = isBst
+      ? `~$${(dropSOL*solPriceUSD).toFixed(2)} drop + 0.1 SOL boost`
+      : `~$${(dropSOL*solPriceUSD).toFixed(2)}`;
+    document.getElementById('s3row').innerHTML = isBst
+      ? `<button class="btn-ghost" onclick="toStep(2)">← Back</button>
+         <button class="btn-gold" id="submitBtn" onclick="submitDrop()">⚡ Pay & Boost</button>`
+      : `<button class="btn-ghost" onclick="toStep(2)">← Back</button>
+         <button class="btn-primary" id="submitBtn" onclick="submitDrop()">✨ Drop Emote</button>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// SUBMIT DROP — real Solana tx
+// ════════════════════════════════════════════════════════════════
+async function submitDrop() {
+  const handle    = document.getElementById('handleI').value.trim() || 'anon';
+  const isBoosted = selT === 'b';
+  const solAmt    = isBoosted ? +(dropSOL + boostSOL).toFixed(6) : dropSOL;
+  const lamports  = Math.round(solAmt * solanaWeb3.LAMPORTS_PER_SOL);
+
+  const btn  = document.getElementById('submitBtn');
+  const stEl = document.getElementById('txStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Signing...';
+  setTxSt(stEl, 'pending', '🔄 Awaiting wallet approval...');
+
+  try {
+    if (!DEV_PUBKEY) throw new Error('Invalid DEV_WALLET in CONFIG. Please check the address.');
+    const prov = getActiveProv();
+    if (!prov) throw new Error('No wallet detected. Please install Phantom or Solflare.');
+
+    setTxSt(stEl, 'pending', '⏳ Sending to Solana devnet...');
+    const sig = await sendTx(prov, walletPubkey, DEV_PUBKEY, lamports);
+
+    setTxSt(stEl, 'ok',
+      `✅ Confirmed! <a class="tx-link" href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank">View on Explorer ↗</a>`);
+
+    stats.sol += solAmt;
+    setTimeout(() => {
+      closeOv('formOv');
+      addDrop(handle, isBoosted, solAmt, walletPubkey.toBase58());
+      notif(`${isBoosted ? '⚡ Boosted' : '✨ Dropped'}! ${solAmt} SOL sent.`, 'ok');
+    }, 1400);
+
+  } catch(e) {
+    console.error('submitDrop error:', e);
+    setTxSt(stEl, 'err', '❌ ' + (e.message || 'Transaction failed'));
+    btn.disabled = false;
+    btn.innerHTML = isBoosted ? '⚡ Pay & Boost' : '✨ Drop Emote';
+  }
+}
+
+function setTxSt(el, type, html) {
+  el.className = 'tx-status tx-' + type;
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════════
+// DROPS
+// ════════════════════════════════════════════════════════════════
+function addDrop(handle, boosted, solPaid, creatorPubkey) {
+  const now = Date.now();
+  const id  = String(now) + '_' + Math.random().toString(36).slice(2,8);
+  const drop = {
+    id, handle, emote: selE, boosted, solPaid, creatorPubkey,
+    createdAt:      now,
+    boostExpiresAt: boosted ? now + CONFIG.BOOST_DURATION_MS : null,
+    expiresAt:      now + CONFIG.DROP_LIFETIME_MS,
+  };
+  drops.push(drop);
+  saveDrop(drop);  // simpan ke Gun.js — semua user akan melihat
+  renderCard(drop);
+  stats.tot++; if (boosted) stats.b++;
+  updateStats(); updateTopEmotes();
+  document.getElementById(boosted ? 'bEmpty' : 'nEmpty').style.display = 'none';
+}
+
+function renderCard(drop) {
+  const existing = document.getElementById('c' + drop.id);
+  if (existing) existing.remove();
+  const wall = document.getElementById(drop.boosted ? 'boostWall' : 'normalWall');
+  const div  = document.createElement('div');
+  div.className = 'ecard ' + (drop.boosted ? 'ecard-b' : 'ecard-n');
+  div.id = 'c' + drop.id;
+
+  const now      = Date.now();
+  const expiring = (drop.expiresAt - now) < 3600000;
+  const timerTxt = drop.boosted
+    ? '⚡ ' + fmtLeft(drop.boostExpiresAt)
+    : '⏱ ' + fmtLeft(drop.expiresAt);
+  const boostBtn = !drop.boosted
+    ? `<button class="btn-boost-ov" onclick="doBoost('${drop.id}');event.stopPropagation()">⚡ Boost</button>` : '';
+
+  div.innerHTML = `
+    ${drop.boosted ? '<div class="boost-badge">⚡ BOOST</div>' : ''}
+    <span class="ecard-emoji">${drop.emote}</span>
+    <div class="card-handle">@${esc(drop.handle)}</div>
+    <div class="card-timer ${drop.boosted?'boost-t':''} ${expiring?'expiring':''}" id="t${drop.id}">${timerTxt}</div>
+    <div class="card-overlay">
+      <div class="ov-handle">@${esc(drop.handle)}</div>
+      <button class="btn-tip-ov" onclick="openTip('${drop.id}');event.stopPropagation()">💙 Tip</button>
+      ${boostBtn}
+    </div>`;
+
+  const emp = document.getElementById(drop.boosted ? 'bEmpty' : 'nEmpty');
+  wall.insertBefore(div, emp.nextSibling);
+  updateCounts();
+}
+
+// ════════════════════════════════════════════════════════════════
+// TIMERS
+// ════════════════════════════════════════════════════════════════
+function tickTimers() {
+  const now = Date.now();
+  const rem = [], deg = [];
+  drops.forEach(d => {
+    if (now >= d.expiresAt)                                       { rem.push(d.id); return; }
+    if (d.boosted && d.boostExpiresAt && now >= d.boostExpiresAt) { deg.push(d.id); return; }
+    const el = document.getElementById('t' + d.id);
+    if (!el) return;
+    const exp = (d.expiresAt - now) < 3600000;
+    el.className   = `card-timer ${d.boosted?'boost-t':''} ${exp?'expiring':''}`;
+    el.textContent = d.boosted ? '⚡ '+fmtLeft(d.boostExpiresAt) : '⏱ '+fmtLeft(d.expiresAt);
+  });
+  rem.forEach(id => expireDrop(id));
+  deg.forEach(id => downgrade(id));
+}
+
+function fmtLeft(ts) {
+  const ms = ts - Date.now();
+  if (ms <= 0) return 'expired';
+  const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function expireDrop(id) {
+  const el = document.getElementById('c'+id);
+  if (el) { el.style.opacity='0'; el.style.transform='scale(.8)'; el.style.transition='all .4s'; setTimeout(()=>el.remove(),400); }
+  const d = drops.find(x=>x.id==id);
+  drops = drops.filter(x=>x.id!=id);
+  if (d) { stats.tot=Math.max(0,stats.tot-1); if(d.boosted) stats.b=Math.max(0,stats.b-1); }
+  // Tandai sebagai expired di Gun supaya user lain juga hapus
+  dropsDB.get(String(id)).put({ expiresAt: Date.now() - 1 });
+  updateStats(); updateCounts(); updateTopEmotes();
+}
+
+function downgrade(id) {
+  const d = drops.find(x=>x.id==id);
+  if (!d||!d.boosted) return;
+  d.boosted = false; stats.b = Math.max(0, stats.b-1);
+  renderCard(d);
+  if (!drops.some(x=>x.boosted)) document.getElementById('bEmpty').style.display='';
+  updateStats(); updateCounts(); updateTopEmotes();
+  notif(`@${d.handle}'s boost expired — moved to wall`);
+}
+
+// ════════════════════════════════════════════════════════════════
+// BOOST EXISTING CARD
+// ════════════════════════════════════════════════════════════════
+async function doBoost(id) {
+  if (!walletPubkey) { openWalletModal(); return; }
+  const d = drops.find(x=>x.id==id);
+  if (!d||d.boosted) return;
+  const lamports = Math.round(boostSOL * solanaWeb3.LAMPORTS_PER_SOL);
+  notif('Signing boost transaction...');
+  try {
+    const prov = getActiveProv();
+    if (!prov) throw new Error('No wallet detected');
+    const sig = await sendTx(prov, walletPubkey, DEV_PUBKEY, lamports);
+    const now = Date.now();
+    d.boosted = true; d.boostExpiresAt = now + CONFIG.BOOST_DURATION_MS;
+    saveBoostUpdate(d.id, d.boostExpiresAt);  // sync ke semua user
+    stats.b++; stats.sol += boostSOL;
+    renderCard(d);
+    if (!drops.filter(x=>!x.boosted).length) document.getElementById('nEmpty').style.display='';
+    updateStats(); updateTopEmotes();
+    notif('⚡ Boosted for 6 hours!', 'ok');
+  } catch(e) {
+    notif('Boost failed: ' + (e.message||'unknown error'), 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// TIP
+// ════════════════════════════════════════════════════════════════
+function openTip(id) {
+  if (!walletPubkey) { openWalletModal(); return; }
+  tipDrop = drops.find(d=>d.id==id);
+  if (!tipDrop) return;
+  document.getElementById('tipTo').textContent = '@'+tipDrop.handle;
+  document.querySelectorAll('.tip-o').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.tip-o')[1].classList.add('on');
+  selTip = '0.005';
+  document.getElementById('tipTxSt').className = 'tx-status';
+  document.getElementById('tipTxSt').innerHTML = '';
+  document.getElementById('tipSendBtn').disabled   = false;
+  document.getElementById('tipSendBtn').textContent = 'Send Tip 💙';
+  document.getElementById('tipOv').classList.add('show');
+}
+
+function pickTip(btn, sol) {
+  document.querySelectorAll('.tip-o').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); selTip = sol;
+}
+
+async function sendTip() {
+  if (!tipDrop||!walletPubkey) return;
+  let recip;
+  try { recip = new solanaWeb3.PublicKey(tipDrop.creatorPubkey); }
+  catch(e) { notif('Invalid creator wallet', 'err'); return; }
+
+  const lamports = Math.round(parseFloat(selTip) * solanaWeb3.LAMPORTS_PER_SOL);
+  const stEl = document.getElementById('tipTxSt');
+  const btn  = document.getElementById('tipSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Sending...';
+  setTxSt(stEl, 'pending', '🔄 Sending tip...');
+
+  try {
+    const prov = getActiveProv();
+    if (!prov) throw new Error('No wallet detected');
+    const sig = await sendTx(prov, walletPubkey, recip, lamports);
+    setTxSt(stEl, 'ok',
+      `✅ Tip sent! <a class="tx-link" href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank">View on Explorer ↗</a>`);
+    stats.sol += parseFloat(selTip);
+    updateStats();
+    setTimeout(() => closeOv('tipOv'), 2200);
+    notif(`💙 ${selTip} SOL tipped to @${tipDrop.handle}!`, 'ok');
+  } catch(e) {
+    setTxSt(stEl, 'err', '❌ ' + (e.message||'Tip failed'));
+    btn.disabled = false; btn.textContent = 'Try Again';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// TOP EMOTES
+// ════════════════════════════════════════════════════════════════
+function updateTopEmotes() {
+  const freq = {};
+  drops.forEach(d => { freq[d.emote] = (freq[d.emote]||0) + 1; });
+  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const c = document.getElementById('topEmotes');
+  if (!sorted.length) { c.innerHTML='<span class="te-empty">No drops yet</span>'; return; }
+  c.innerHTML = sorted.map(([em,n]) =>
+    `<div class="te-item"><span class="te-em">${em}</span><span class="te-cnt">${n}x</span></div>`
+  ).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// ABOUT
+// ════════════════════════════════════════════════════════════════
+function openAbout() { document.getElementById('aboutOv').classList.add('show'); }
+
+// ════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════
+function closeOv(id) { document.getElementById(id).classList.remove('show'); }
+function updateStats() {
+  document.getElementById('sTot').textContent = stats.tot;
+  document.getElementById('sB').textContent   = stats.b;
+  document.getElementById('sSOL').textContent = stats.sol.toFixed(4);
+}
+function updateCounts() {
+  document.getElementById('bCnt').textContent = drops.filter(d=>d.boosted).length + ' active';
+  document.getElementById('nCnt').textContent = drops.filter(d=>!d.boosted).length + ' drops';
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+let nT;
+function notif(msg, type='') {
+  document.querySelectorAll('.notif').forEach(n=>n.remove());
+  const n = document.createElement('div');
+  n.className = 'notif' + (type ? ' '+type : '');
+  n.innerHTML = msg;
+  document.body.appendChild(n);
+  clearTimeout(nT);
+  nT = setTimeout(()=>{ n.style.opacity='0'; n.style.transition='opacity .4s'; setTimeout(()=>n.remove(),400); }, 4500);
+}
+
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+updateStats(); updateCounts(); updateTopEmotes();
+
+</script>
+</body>
+</html>
