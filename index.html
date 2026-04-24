@@ -295,6 +295,177 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:var(--butter-light);}
 ::-webkit-scrollbar-thumb{background:var(--blue-pale);border-radius:4px;}
+
+/* ── MOBILE FIXES ── */
+@media (max-width: 600px) {
+
+  /* NAV: stack jadi 2 baris */
+  nav {
+    height: auto;
+    flex-wrap: wrap;
+    padding: .5rem .9rem;
+    gap: .4rem;
+  }
+  .logo {
+    font-size: 1rem;
+    flex: 1;
+  }
+  /* Sembunyikan nav-mid (About) di mobile — pindah ke baris bawah */
+  .nav-mid {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    gap: .4rem;
+  }
+  .nav-link {
+    font-size: .72rem;
+    padding: .28rem .65rem;
+  }
+  /* nav-right: connect + drop emote sejajar kanan */
+  .nav-right {
+    gap: .4rem;
+  }
+  .btn-connect {
+    font-size: .72rem;
+    padding: .38rem .8rem;
+    gap: .3rem;
+  }
+  .btn-connect svg { width: 12px; height: 12px; }
+  .wallet-chip {
+    font-size: .68rem;
+    padding: .3rem .65rem;
+  }
+
+  /* ★ BUTTON DROP EMOTE — Prominent di mobile */
+  .btn-add {
+    font-size: .8rem;
+    font-weight: 800;
+    padding: .48rem 1rem;
+    background: var(--blue);
+    color: var(--white);
+    border-color: var(--blue);
+    border-radius: 50px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(40,92,204,.25);
+  }
+  .btn-add:hover {
+    background: var(--blue-dark);
+    color: var(--white);
+  }
+
+  /* Devnet banner offset sesuai nav baru */
+  .devnet-banner {
+    top: auto;
+    position: sticky;
+    font-size: .66rem;
+    padding: .28rem .8rem;
+  }
+
+  /* PAGE padding sesuai nav 2 baris (~96px) */
+  .page { padding-top: 96px; }
+
+  /* TOP BAR */
+  .top-bar {
+    top: 0;
+    padding: .45rem .9rem;
+    gap: .4rem;
+  }
+  .top-bar-lbl { font-size: .58rem; }
+
+  /* SEC LABEL */
+  .sec-label {
+    top: 0;
+    padding: .5rem .9rem;
+    font-size: .63rem;
+  }
+
+  /* WALL: 3 kartu per baris */
+  .wall {
+    padding: .8rem .9rem;
+    gap: 10px;
+  }
+  .ecard {
+    width: calc(33.333% - 7px);
+    height: auto;
+    aspect-ratio: 1;
+    min-width: 90px;
+  }
+  .ecard-emoji { font-size: 2.4rem; }
+  .card-handle { font-size: .62rem; max-width: 90%; }
+  .card-timer  { font-size: .48rem; }
+
+  /* MODAL: full-width, dari bawah */
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: 1.4rem 1.2rem 2rem;
+    max-height: 88vh;
+    border-bottom: none;
+  }
+
+  /* EMOTE GRID: 6 kolom tetap tapi emoji lebih kecil */
+  .eg { gap: .28rem; }
+  .eg-b { font-size: 1.15rem; border-radius: 8px; }
+
+  /* TYPE CARDS: stack vertikal */
+  .type-row { flex-direction: column; gap: .5rem; }
+  .tc { padding: .75rem; display: flex; align-items: center; gap: .6rem; text-align: left; }
+  .tc-ico { font-size: 1.4rem; margin-bottom: 0; flex-shrink: 0; }
+  .tc-s  { font-size: .6rem; }
+  .tc-p  { font-size: .72rem; margin-top: 2px; }
+
+  /* TIP GRID */
+  .tip-grid { gap: .4rem; }
+  .tip-sol  { font-size: .8rem; }
+
+  /* BTN ROW */
+  .btn-row { gap: .4rem; }
+  .btn-primary, .btn-gold, .btn-ghost {
+    font-size: .8rem;
+    padding: .72rem .5rem;
+  }
+
+  /* STATS BAR: scroll horizontal */
+  .stats-bar {
+    gap: .7rem;
+    padding: .42rem .9rem;
+    font-size: .63rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .sb-it { flex-shrink: 0; }
+  .sb-live { flex-shrink: 0; font-size: .58rem; }
+
+  /* NOTIF */
+  .notif {
+    left: .8rem;
+    right: .8rem;
+    bottom: 3.5rem;
+    max-width: none;
+    font-size: .74rem;
+  }
+}
+
+/* Sembunyikan teks "Connect Wallet" di mobile ≤600px — icon saja */
+@media (max-width: 600px) {
+  .btn-connect-txt { display: none; }
+  .btn-connect { padding: .4rem .65rem; min-width: 36px; justify-content: center; }
+  .nav-right { flex-wrap: nowrap; }
+}
+
+/* Layar sangat kecil (<380px) */
+@media (max-width: 380px) {
+  .ecard { min-width: 78px; }
+  .ecard-emoji { font-size: 2rem; }
+  .logo { font-size: .9rem; }
+  .btn-add { font-size: .72rem; padding: .4rem .8rem; }
+  .btn-connect { padding: .38rem .55rem; }
+}
 </style>
 </head>
 <body>
@@ -312,9 +483,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
         <rect x="1" y="6" width="22" height="14" rx="2"/>
         <path d="M16 14a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/>
       </svg>
-      Connect Wallet
+      <span class="btn-connect-txt">Connect Wallet</span>
     </button>
-    <button class="btn-add" id="aBtn" style="display:none" onclick="openForm()">+ Drop Emote</button>
+    <button class="btn-add" id="aBtn" style="display:none" onclick="openForm()">
+      <span>+</span> Drop Emote
+    </button>
   </div>
 </nav>
 
