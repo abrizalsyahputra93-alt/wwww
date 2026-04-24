@@ -53,10 +53,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
   border-radius:50px;font-size:.75rem;font-weight:700;color:var(--green);}
 .chip-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pdot 2s infinite;}
 @keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(26,158,106,.4)}50%{opacity:.8;box-shadow:0 0 0 4px rgba(26,158,106,0)}}
+
+/* DROP EMOTE BUTTON — desktop */
 .btn-add{display:flex;align-items:center;gap:.4rem;padding:.45rem 1.1rem;
   background:var(--butter-dark);border:2px solid var(--blue);border-radius:50px;cursor:pointer;
   font-family:'Plus Jakarta Sans',sans-serif;font-size:.78rem;font-weight:700;color:var(--blue);transition:all .2s;}
 .btn-add:hover{background:var(--blue);color:var(--white);}
+/* Sembunyikan teks label di mobile, tampilkan ikon lingkaran */
+.btn-add-text{display:inline;}
 
 /* DEVNET BANNER */
 .devnet-banner{position:fixed;top:58px;left:0;right:0;z-index:150;
@@ -295,6 +299,33 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:var(--butter-light);}
 ::-webkit-scrollbar-thumb{background:var(--blue-pale);border-radius:4px;}
+
+/* ── MOBILE: hanya perbaikan tombol Drop Emote ── */
+@media (max-width: 520px) {
+  /* Tombol jadi lingkaran kecil, hanya tampilkan ikon + */
+  .btn-add {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    gap: 0;
+  }
+  /* Sembunyikan teks label */
+  .btn-add-text { display: none; }
+  /* Sembunyikan ikon SVG asli */
+  .btn-add-icon { display: none; }
+  /* Tampilkan ikon + via pseudo-element */
+  .btn-add::before {
+    content: '+';
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--blue);
+    line-height: 1;
+  }
+  .btn-add:hover::before { color: var(--white); }
+}
 </style>
 </head>
 <body>
@@ -314,7 +345,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
       </svg>
       Connect Wallet
     </button>
-    <button class="btn-add" id="aBtn" style="display:none" onclick="openForm()">+ Drop Emote</button>
+    <!-- btn-add-icon dan btn-add-text dipisah agar bisa disembunyikan di mobile -->
+    <button class="btn-add" id="aBtn" style="display:none" onclick="openForm()">
+      <svg class="btn-add-icon" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <span class="btn-add-text">Drop Emote</span>
+    </button>
   </div>
 </nav>
 
@@ -505,24 +542,18 @@ const CONFIG = {
   RPC_URL:          'https://api.devnet.solana.com',
   DEV_WALLET:       '56kBa5NZX1NGYtjbXVeLLGvdczs1mKsmWtYrLq8dkeoi',
   DROP_USD:          0.10,
-  BOOST_SOL_FLAT:    0.1,        // fixed 0.1 SOL for boost
+  BOOST_SOL_FLAT:    0.1,
   DROP_LIFETIME_MS:  24*60*60*1000,
   BOOST_DURATION_MS:  6*60*60*1000,
 };
 
-// ════════════════════════════════════════════════════════════════
-// SOLANA SETUP
-// ════════════════════════════════════════════════════════════════
 const connection = new solanaWeb3.Connection(CONFIG.RPC_URL, 'confirmed');
 let DEV_PUBKEY = null;
 try { DEV_PUBKEY = new solanaWeb3.PublicKey(CONFIG.DEV_WALLET); } catch(e) { console.error('Bad DEV_WALLET:', e); }
 
-// ════════════════════════════════════════════════════════════════
-// SOL PRICE — drop cost is ~$0.10 in SOL; boost is 0.1 SOL flat
-// ════════════════════════════════════════════════════════════════
 let solPriceUSD = 150;
 let dropSOL     = +(CONFIG.DROP_USD / solPriceUSD).toFixed(6);
-const boostSOL  = CONFIG.BOOST_SOL_FLAT;  // always 0.1 SOL
+const boostSOL  = CONFIG.BOOST_SOL_FLAT;
 
 async function fetchSolPrice() {
   try {
@@ -541,9 +572,6 @@ async function fetchSolPrice() {
 fetchSolPrice();
 setInterval(fetchSolPrice, 60000);
 
-// ════════════════════════════════════════════════════════════════
-// MOODS — emotions / feelings only (35)
-// ════════════════════════════════════════════════════════════════
 const MOODS = [
   '😊','😂','❤️','😍','😭','😎','🥳','😅','🤣','💯',
   '🙏','😱','🥰','😢','😡','🤔','🫂','💀','😴','🤯',
@@ -560,37 +588,23 @@ const MOODS = [
   });
 })();
 
-// ════════════════════════════════════════════════════════════════
-// STATE
-// ════════════════════════════════════════════════════════════════
 let walletPubkey = null;
 let selE = null, selT = 'n', selTip = '0.005', tipDrop = null;
 let drops = [], stats = { tot:0, b:0, sol:0 };
 setInterval(tickTimers, 10000);
 
-// ════════════════════════════════════════════════════════════════
-// GUN.JS — decentralized shared storage (no backend needed)
-// Drops disimpan di jaringan Gun peer-to-peer, bisa dibaca semua orang
-// ════════════════════════════════════════════════════════════════
 const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
 const dropsDB = gun.get('emotedrop-v1').get('drops');
 
-// Dengarkan drops baru dari semua user
 dropsDB.map().on(function(data, key) {
   if (!data || !data.id) return;
   const now = Date.now();
-
-  // Buang yang sudah expired
   if (data.expiresAt && now >= data.expiresAt) {
     if (drops.find(d => d.id === key)) expireDrop(key);
     return;
   }
-
-  // Cek apakah sudah ada di lokal
   const existing = drops.find(d => d.id === key);
-  if (existing) return; // sudah ada, skip
-
-  // Tambah ke lokal
+  if (existing) return;
   const drop = { ...data, id: key };
   drops.push(drop);
   renderCard(drop);
@@ -601,90 +615,51 @@ dropsDB.map().on(function(data, key) {
   updateStats(); updateCounts(); updateTopEmotes();
 });
 
-function saveDrop(drop) {
-  dropsDB.get(String(drop.id)).put(drop);
-}
+function saveDrop(drop) { dropsDB.get(String(drop.id)).put(drop); }
+function saveBoostUpdate(id, boostExpiresAt) { dropsDB.get(String(id)).put({ boosted: true, boostExpiresAt }); }
 
-function saveBoostUpdate(id, boostExpiresAt) {
-  dropsDB.get(String(id)).put({ boosted: true, boostExpiresAt });
-}
-
-// ════════════════════════════════════════════════════════════════
-// SEND TX — Buffer polyfill loaded above, so serialize() works fine.
-// Three paths: Phantom request API → signAndSendTransaction → signTransaction
-// ════════════════════════════════════════════════════════════════
 async function sendTx(prov, from, to, lamports) {
   const tx = new solanaWeb3.Transaction();
   tx.add(solanaWeb3.SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports }));
-
   const latestBlock = await connection.getLatestBlockhash('finalized');
-  tx.recentBlockhash      = latestBlock.blockhash;
-  tx.feePayer             = from;
-
+  tx.recentBlockhash = latestBlock.blockhash;
+  tx.feePayer = from;
   let sig;
-
   try {
-    // ── Path 1: signAndSendTransaction (Phantom, Solflare native) ──
-    // Returns { signature: string } or just a string
     if (typeof prov.signAndSendTransaction === 'function') {
       const res = await prov.signAndSendTransaction(tx);
       sig = (res && typeof res.signature === 'string') ? res.signature
-          : (typeof res === 'string') ? res
-          : null;
+          : (typeof res === 'string') ? res : null;
     }
-
-    // ── Path 2: signTransaction + sendRawTransaction ──
-    // Buffer polyfill ensures serialize() works in browser
     if (!sig && typeof prov.signTransaction === 'function') {
-      const signed   = await prov.signTransaction(tx);
-      const rawBytes = signed.serialize();        // works now — Buffer is polyfilled
-      sig = await connection.sendRawTransaction(rawBytes, {
-        skipPreflight:       false,
-        preflightCommitment: 'confirmed',
-      });
+      const signed = await prov.signTransaction(tx);
+      const rawBytes = signed.serialize();
+      sig = await connection.sendRawTransaction(rawBytes, { skipPreflight: false, preflightCommitment: 'confirmed' });
     }
-
     if (!sig) throw new Error('Wallet returned no signature. Please try again.');
-
   } catch (e) {
-    // Re-throw wallet rejection cleanly
-    if (e.code === 4001 || /rejected|cancelled|denied/i.test(e.message || '')) {
-      throw new Error('Transaction rejected by wallet.');
-    }
+    if (e.code === 4001 || /rejected|cancelled|denied/i.test(e.message || '')) throw new Error('Transaction rejected by wallet.');
     throw e;
   }
-
-  // ── Confirm via polling (more reliable than WS on devnet) ──
   await waitForConfirmation(sig, latestBlock.lastValidBlockHeight);
   return sig;
 }
 
-// Polling confirmation — avoids WebSocket timeout issues on devnet
 async function waitForConfirmation(sig, lastValidBlockHeight) {
   const TIMEOUT_MS = 90000;
   const start = Date.now();
-
   while (Date.now() - start < TIMEOUT_MS) {
     const status = await connection.getSignatureStatus(sig, { searchTransactionHistory: false });
-    const val    = status?.value;
-
+    const val = status?.value;
     if (val?.err) throw new Error('Transaction failed on-chain: ' + JSON.stringify(val.err));
     if (val?.confirmationStatus === 'confirmed' || val?.confirmationStatus === 'finalized') return;
-
     const blockHeight = await connection.getBlockHeight('confirmed');
-    if (blockHeight > lastValidBlockHeight) {
-      throw new Error('Transaction expired. Please try again.');
-    }
-
+    if (blockHeight > lastValidBlockHeight) throw new Error('Transaction expired. Please try again.');
     await new Promise(r => setTimeout(r, 2000));
   }
-  // Timeout — but tx might still land; show Explorer link anyway
   throw new Error('Confirmation timeout — transaction may still succeed. Check Explorer.');
 }
 
-// ════════════════════════════════════════════════════════════════
-// WALLET CONNECT
-// ════════════════════════════════════════════════════════════════
 function openWalletModal() { document.getElementById('walletOv').classList.add('show'); }
 
 async function connectWallet(name) {
@@ -692,17 +667,14 @@ async function connectWallet(name) {
   const prov = getProvider(name);
   if (!prov) {
     const urls = { phantom:'https://phantom.app', solflare:'https://solflare.com', backpack:'https://backpack.app' };
-    notif(
-      `❌ ${cap(name)} not found — <a href="${urls[name]||'#'}" target="_blank" style="color:inherit;text-decoration:underline">install it here ↗</a>`,
-      'err'
-    );
+    notif(`❌ ${cap(name)} not found — <a href="${urls[name]||'#'}" target="_blank" style="color:inherit;text-decoration:underline">install it here ↗</a>`,'err');
     return;
   }
   try {
     notif('Connecting...');
     const resp = await prov.connect();
     walletPubkey = resp.publicKey;
-    const addr  = walletPubkey.toBase58();
+    const addr = walletPubkey.toBase58();
     document.getElementById('cBtn').style.display = 'none';
     const wd = document.getElementById('wDisplay');
     wd.style.display = 'flex';
@@ -721,26 +693,19 @@ function getProvider(n) {
   return null;
 }
 function getActiveProv() {
-  return window.phantom?.solana
-      || window.solflare
-      || window.xnft?.solana
-      || (window.solana?.isPhantom ? window.solana : null)
-      || window.solana
-      || null;
+  return window.phantom?.solana || window.solflare || window.xnft?.solana
+      || (window.solana?.isPhantom ? window.solana : null) || window.solana || null;
 }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-// ════════════════════════════════════════════════════════════════
-// FORM FLOW
-// ════════════════════════════════════════════════════════════════
 function openForm() {
   if (!walletPubkey) { openWalletModal(); return; }
   selE = null; selT = 'n';
   document.querySelectorAll('.eg-b').forEach(b => b.classList.remove('on'));
-  document.getElementById('s1next').disabled      = true;
-  document.getElementById('handleI').value        = '';
-  document.getElementById('txStatus').className   = 'tx-status';
-  document.getElementById('txStatus').innerHTML   = '';
+  document.getElementById('s1next').disabled = true;
+  document.getElementById('handleI').value = '';
+  document.getElementById('txStatus').className = 'tx-status';
+  document.getElementById('txStatus').innerHTML = '';
   pickType('n');
   toStep(1);
   document.getElementById('formOv').classList.add('show');
@@ -762,18 +727,15 @@ function pickType(t) {
 function toStep(n) {
   ['s1','s2','s3'].forEach((id,i) => document.getElementById(id).style.display = (i+1===n ? 'block' : 'none'));
   ['d1','d2','d3'].forEach((id,i) => document.getElementById(id).classList.toggle('on', i+1<=n));
-
   if (n === 2) {
     document.getElementById('s2prev').innerHTML =
-      `<span class="pp-e">${selE}</span>
-       <div><div class="pp-n">Mood selected</div><div class="pp-s">Choose post type</div></div>`;
+      `<span class="pp-e">${selE}</span><div><div class="pp-n">Mood selected</div><div class="pp-s">Choose post type</div></div>`;
   }
   if (n === 3) {
     const isBst = selT === 'b';
-    const sol   = isBst ? +(dropSOL + boostSOL).toFixed(6) : dropSOL;
+    const sol = isBst ? +(dropSOL + boostSOL).toFixed(6) : dropSOL;
     document.getElementById('s3prev').innerHTML =
-      `<span class="pp-e">${selE}</span>
-       <div><div class="pp-n">${isBst ? '⚡ Boost' : '✨ Normal'}</div>
+      `<span class="pp-e">${selE}</span><div><div class="pp-n">${isBst ? '⚡ Boost' : '✨ Normal'}</div>
        <div class="pp-s">${isBst ? 'Pinned 6h + 24h life' : 'Lives 24 hours'}</div></div>`;
     document.getElementById('costSol').textContent = sol + ' SOL';
     document.getElementById('costUsd').textContent = isBst
@@ -787,39 +749,29 @@ function toStep(n) {
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// SUBMIT DROP — real Solana tx
-// ════════════════════════════════════════════════════════════════
 async function submitDrop() {
-  const handle    = document.getElementById('handleI').value.trim() || 'anon';
+  const handle = document.getElementById('handleI').value.trim() || 'anon';
   const isBoosted = selT === 'b';
-  const solAmt    = isBoosted ? +(dropSOL + boostSOL).toFixed(6) : dropSOL;
-  const lamports  = Math.round(solAmt * solanaWeb3.LAMPORTS_PER_SOL);
-
-  const btn  = document.getElementById('submitBtn');
+  const solAmt = isBoosted ? +(dropSOL + boostSOL).toFixed(6) : dropSOL;
+  const lamports = Math.round(solAmt * solanaWeb3.LAMPORTS_PER_SOL);
+  const btn = document.getElementById('submitBtn');
   const stEl = document.getElementById('txStatus');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Signing...';
   setTxSt(stEl, 'pending', '🔄 Awaiting wallet approval...');
-
   try {
-    if (!DEV_PUBKEY) throw new Error('Invalid DEV_WALLET in CONFIG. Please check the address.');
+    if (!DEV_PUBKEY) throw new Error('Invalid DEV_WALLET in CONFIG.');
     const prov = getActiveProv();
-    if (!prov) throw new Error('No wallet detected. Please install Phantom or Solflare.');
-
+    if (!prov) throw new Error('No wallet detected.');
     setTxSt(stEl, 'pending', '⏳ Sending to Solana devnet...');
     const sig = await sendTx(prov, walletPubkey, DEV_PUBKEY, lamports);
-
-    setTxSt(stEl, 'ok',
-      `✅ Confirmed! <a class="tx-link" href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank">View on Explorer ↗</a>`);
-
+    setTxSt(stEl, 'ok', `✅ Confirmed! <a class="tx-link" href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank">View on Explorer ↗</a>`);
     stats.sol += solAmt;
     setTimeout(() => {
       closeOv('formOv');
       addDrop(handle, isBoosted, solAmt, walletPubkey.toBase58());
       notif(`${isBoosted ? '⚡ Boosted' : '✨ Dropped'}! ${solAmt} SOL sent.`, 'ok');
     }, 1400);
-
   } catch(e) {
     console.error('submitDrop error:', e);
     setTxSt(stEl, 'err', '❌ ' + (e.message || 'Transaction failed'));
@@ -828,25 +780,19 @@ async function submitDrop() {
   }
 }
 
-function setTxSt(el, type, html) {
-  el.className = 'tx-status tx-' + type;
-  el.innerHTML = html;
-}
+function setTxSt(el, type, html) { el.className = 'tx-status tx-' + type; el.innerHTML = html; }
 
-// ════════════════════════════════════════════════════════════════
-// DROPS
-// ════════════════════════════════════════════════════════════════
 function addDrop(handle, boosted, solPaid, creatorPubkey) {
   const now = Date.now();
-  const id  = String(now) + '_' + Math.random().toString(36).slice(2,8);
+  const id = String(now) + '_' + Math.random().toString(36).slice(2,8);
   const drop = {
     id, handle, emote: selE, boosted, solPaid, creatorPubkey,
-    createdAt:      now,
+    createdAt: now,
     boostExpiresAt: boosted ? now + CONFIG.BOOST_DURATION_MS : null,
-    expiresAt:      now + CONFIG.DROP_LIFETIME_MS,
+    expiresAt: now + CONFIG.DROP_LIFETIME_MS,
   };
   drops.push(drop);
-  saveDrop(drop);  // simpan ke Gun.js — semua user akan melihat
+  saveDrop(drop);
   renderCard(drop);
   stats.tot++; if (boosted) stats.b++;
   updateStats(); updateTopEmotes();
@@ -857,18 +803,14 @@ function renderCard(drop) {
   const existing = document.getElementById('c' + drop.id);
   if (existing) existing.remove();
   const wall = document.getElementById(drop.boosted ? 'boostWall' : 'normalWall');
-  const div  = document.createElement('div');
+  const div = document.createElement('div');
   div.className = 'ecard ' + (drop.boosted ? 'ecard-b' : 'ecard-n');
   div.id = 'c' + drop.id;
-
-  const now      = Date.now();
+  const now = Date.now();
   const expiring = (drop.expiresAt - now) < 3600000;
-  const timerTxt = drop.boosted
-    ? '⚡ ' + fmtLeft(drop.boostExpiresAt)
-    : '⏱ ' + fmtLeft(drop.expiresAt);
+  const timerTxt = drop.boosted ? '⚡ ' + fmtLeft(drop.boostExpiresAt) : '⏱ ' + fmtLeft(drop.expiresAt);
   const boostBtn = !drop.boosted
     ? `<button class="btn-boost-ov" onclick="doBoost('${drop.id}');event.stopPropagation()">⚡ Boost</button>` : '';
-
   div.innerHTML = `
     ${drop.boosted ? '<div class="boost-badge">⚡ BOOST</div>' : ''}
     <span class="ecard-emoji">${drop.emote}</span>
@@ -879,25 +821,21 @@ function renderCard(drop) {
       <button class="btn-tip-ov" onclick="openTip('${drop.id}');event.stopPropagation()">💙 Tip</button>
       ${boostBtn}
     </div>`;
-
   const emp = document.getElementById(drop.boosted ? 'bEmpty' : 'nEmpty');
   wall.insertBefore(div, emp.nextSibling);
   updateCounts();
 }
 
-// ════════════════════════════════════════════════════════════════
-// TIMERS
-// ════════════════════════════════════════════════════════════════
 function tickTimers() {
   const now = Date.now();
   const rem = [], deg = [];
   drops.forEach(d => {
-    if (now >= d.expiresAt)                                       { rem.push(d.id); return; }
+    if (now >= d.expiresAt) { rem.push(d.id); return; }
     if (d.boosted && d.boostExpiresAt && now >= d.boostExpiresAt) { deg.push(d.id); return; }
     const el = document.getElementById('t' + d.id);
     if (!el) return;
     const exp = (d.expiresAt - now) < 3600000;
-    el.className   = `card-timer ${d.boosted?'boost-t':''} ${exp?'expiring':''}`;
+    el.className = `card-timer ${d.boosted?'boost-t':''} ${exp?'expiring':''}`;
     el.textContent = d.boosted ? '⚡ '+fmtLeft(d.boostExpiresAt) : '⏱ '+fmtLeft(d.expiresAt);
   });
   rem.forEach(id => expireDrop(id));
@@ -917,7 +855,6 @@ function expireDrop(id) {
   const d = drops.find(x=>x.id==id);
   drops = drops.filter(x=>x.id!=id);
   if (d) { stats.tot=Math.max(0,stats.tot-1); if(d.boosted) stats.b=Math.max(0,stats.b-1); }
-  // Tandai sebagai expired di Gun supaya user lain juga hapus
   dropsDB.get(String(id)).put({ expiresAt: Date.now() - 1 });
   updateStats(); updateCounts(); updateTopEmotes();
 }
@@ -932,9 +869,6 @@ function downgrade(id) {
   notif(`@${d.handle}'s boost expired — moved to wall`);
 }
 
-// ════════════════════════════════════════════════════════════════
-// BOOST EXISTING CARD
-// ════════════════════════════════════════════════════════════════
 async function doBoost(id) {
   if (!walletPubkey) { openWalletModal(); return; }
   const d = drops.find(x=>x.id==id);
@@ -947,7 +881,7 @@ async function doBoost(id) {
     const sig = await sendTx(prov, walletPubkey, DEV_PUBKEY, lamports);
     const now = Date.now();
     d.boosted = true; d.boostExpiresAt = now + CONFIG.BOOST_DURATION_MS;
-    saveBoostUpdate(d.id, d.boostExpiresAt);  // sync ke semua user
+    saveBoostUpdate(d.id, d.boostExpiresAt);
     stats.b++; stats.sol += boostSOL;
     renderCard(d);
     if (!drops.filter(x=>!x.boosted).length) document.getElementById('nEmpty').style.display='';
@@ -958,9 +892,6 @@ async function doBoost(id) {
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// TIP
-// ════════════════════════════════════════════════════════════════
 function openTip(id) {
   if (!walletPubkey) { openWalletModal(); return; }
   tipDrop = drops.find(d=>d.id==id);
@@ -971,7 +902,7 @@ function openTip(id) {
   selTip = '0.005';
   document.getElementById('tipTxSt').className = 'tx-status';
   document.getElementById('tipTxSt').innerHTML = '';
-  document.getElementById('tipSendBtn').disabled   = false;
+  document.getElementById('tipSendBtn').disabled = false;
   document.getElementById('tipSendBtn').textContent = 'Send Tip 💙';
   document.getElementById('tipOv').classList.add('show');
 }
@@ -986,20 +917,17 @@ async function sendTip() {
   let recip;
   try { recip = new solanaWeb3.PublicKey(tipDrop.creatorPubkey); }
   catch(e) { notif('Invalid creator wallet', 'err'); return; }
-
   const lamports = Math.round(parseFloat(selTip) * solanaWeb3.LAMPORTS_PER_SOL);
   const stEl = document.getElementById('tipTxSt');
-  const btn  = document.getElementById('tipSendBtn');
+  const btn = document.getElementById('tipSendBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Sending...';
   setTxSt(stEl, 'pending', '🔄 Sending tip...');
-
   try {
     const prov = getActiveProv();
     if (!prov) throw new Error('No wallet detected');
     const sig = await sendTx(prov, walletPubkey, recip, lamports);
-    setTxSt(stEl, 'ok',
-      `✅ Tip sent! <a class="tx-link" href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank">View on Explorer ↗</a>`);
+    setTxSt(stEl, 'ok', `✅ Tip sent! <a class="tx-link" href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank">View on Explorer ↗</a>`);
     stats.sol += parseFloat(selTip);
     updateStats();
     setTimeout(() => closeOv('tipOv'), 2200);
@@ -1010,9 +938,6 @@ async function sendTip() {
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// TOP EMOTES
-// ════════════════════════════════════════════════════════════════
 function updateTopEmotes() {
   const freq = {};
   drops.forEach(d => { freq[d.emote] = (freq[d.emote]||0) + 1; });
@@ -1024,18 +949,11 @@ function updateTopEmotes() {
   ).join('');
 }
 
-// ════════════════════════════════════════════════════════════════
-// ABOUT
-// ════════════════════════════════════════════════════════════════
 function openAbout() { document.getElementById('aboutOv').classList.add('show'); }
-
-// ════════════════════════════════════════════════════════════════
-// HELPERS
-// ════════════════════════════════════════════════════════════════
 function closeOv(id) { document.getElementById(id).classList.remove('show'); }
 function updateStats() {
   document.getElementById('sTot').textContent = stats.tot;
-  document.getElementById('sB').textContent   = stats.b;
+  document.getElementById('sB').textContent = stats.b;
   document.getElementById('sSOL').textContent = stats.sol.toFixed(4);
 }
 function updateCounts() {
@@ -1057,11 +975,7 @@ function notif(msg, type='') {
   nT = setTimeout(()=>{ n.style.opacity='0'; n.style.transition='opacity .4s'; setTimeout(()=>n.remove(),400); }, 4500);
 }
 
-// ════════════════════════════════════════════════════════════════
-// INIT
-// ════════════════════════════════════════════════════════════════
 updateStats(); updateCounts(); updateTopEmotes();
-
 </script>
 </body>
 </html>
