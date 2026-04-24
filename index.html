@@ -10,8 +10,8 @@
 <script>window.Buffer = window.Buffer || buffer.Buffer;</script>
 <!-- Solana Web3.js -->
 <script src="https://unpkg.com/@solana/web3.js@1.95.4/lib/index.iife.min.js"></script>
-<!-- API endpoint untuk penyimpanan server -->
-<script>const API = 'api.php';</script>
+<!-- Gun.js — decentralized real-time DB, no backend needed -->
+<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
 <style>
 :root {
   --butter:#fff2bd; --butter-dark:#f5e68a; --butter-light:#fffadf;
@@ -569,96 +569,44 @@ let drops = [], stats = { tot:0, b:0, sol:0 };
 setInterval(tickTimers, 10000);
 
 // ════════════════════════════════════════════════════════════════
-// PHP API STORAGE — data tersimpan di server public_html kamu
-// File: api.php (letakkan di folder yang sama dengan index.html)
-// Drop expired 24 jam otomatis dihapus saat load & via cleanup
+// GUN.JS — decentralized shared storage (no backend needed)
+// Drops disimpan di jaringan Gun peer-to-peer, bisa dibaca semua orang
 // ════════════════════════════════════════════════════════════════
+const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+const dropsDB = gun.get('emotedrop-v1').get('drops');
 
-// Muat semua drop aktif dari server
-async function loadDropsFromServer() {
-  try {
-    const r = await fetch(API + '?action=list&_=' + Date.now());
-    const data = await r.json();
-    if (!data.ok || !Array.isArray(data.drops)) return;
-    const now = Date.now();
-    data.drops.forEach(drop => {
-      // Abaikan expired (double-check di sisi klien)
-      if (!drop.expiresAt || now >= drop.expiresAt) return;
-      // Abaikan duplikat
-      if (drops.find(d => d.id === drop.id)) return;
-      drops.push(drop);
-      renderCard(drop);
-      stats.tot++;
-      if (drop.boosted) stats.b++;
-      stats.sol += drop.solPaid || 0;
-      document.getElementById(drop.boosted ? 'bEmpty' : 'nEmpty').style.display = 'none';
-    });
-    updateStats(); updateCounts(); updateTopEmotes();
-  } catch(e) {
-    console.warn('loadDropsFromServer error:', e);
+// Dengarkan drops baru dari semua user
+dropsDB.map().on(function(data, key) {
+  if (!data || !data.id) return;
+  const now = Date.now();
+
+  // Buang yang sudah expired
+  if (data.expiresAt && now >= data.expiresAt) {
+    if (drops.find(d => d.id === key)) expireDrop(key);
+    return;
   }
+
+  // Cek apakah sudah ada di lokal
+  const existing = drops.find(d => d.id === key);
+  if (existing) return; // sudah ada, skip
+
+  // Tambah ke lokal
+  const drop = { ...data, id: key };
+  drops.push(drop);
+  renderCard(drop);
+  stats.tot++;
+  if (drop.boosted) stats.b++;
+  stats.sol += drop.solPaid || 0;
+  document.getElementById(drop.boosted ? 'bEmpty' : 'nEmpty').style.display = 'none';
+  updateStats(); updateCounts(); updateTopEmotes();
+});
+
+function saveDrop(drop) {
+  dropsDB.get(String(drop.id)).put(drop);
 }
 
-// Poll setiap 15 detik untuk mendapat drop dari user lain
-function startPolling() {
-  loadDropsFromServer();
-  setInterval(async () => {
-    try {
-      const r = await fetch(API + '?action=list&_=' + Date.now());
-      const data = await r.json();
-      if (!data.ok || !Array.isArray(data.drops)) return;
-      const now = Date.now();
-      data.drops.forEach(drop => {
-        if (!drop.expiresAt || now >= drop.expiresAt) return;
-        if (drops.find(d => d.id === drop.id)) return; // sudah ada
-        drops.push(drop);
-        renderCard(drop);
-        stats.tot++;
-        if (drop.boosted) stats.b++;
-        stats.sol += drop.solPaid || 0;
-        document.getElementById(drop.boosted ? 'bEmpty' : 'nEmpty').style.display = 'none';
-        updateStats(); updateCounts(); updateTopEmotes();
-      });
-    } catch(e) { /* silent */ }
-  }, 15000);
-}
-
-startPolling();
-
-async function saveDrop(drop) {
-  try {
-    await fetch(API + '?action=save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(drop),
-    });
-  } catch(e) {
-    console.warn('saveDrop error:', e);
-  }
-}
-
-async function saveBoostUpdate(id, boostExpiresAt) {
-  try {
-    await fetch(API + '?action=boost', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, boostExpiresAt }),
-    });
-  } catch(e) {
-    console.warn('saveBoostUpdate error:', e);
-  }
-}
-
-async function deleteDropFromServer(id) {
-  try {
-    await fetch(API + '?action=expire', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-  } catch(e) {
-    console.warn('deleteDropFromServer error:', e);
-  }
+function saveBoostUpdate(id, boostExpiresAt) {
+  dropsDB.get(String(id)).put({ boosted: true, boostExpiresAt });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -969,8 +917,8 @@ function expireDrop(id) {
   const d = drops.find(x=>x.id==id);
   drops = drops.filter(x=>x.id!=id);
   if (d) { stats.tot=Math.max(0,stats.tot-1); if(d.boosted) stats.b=Math.max(0,stats.b-1); }
-  // Hapus dari server supaya user lain juga tidak lihat
-  deleteDropFromServer(String(id));
+  // Tandai sebagai expired di Gun supaya user lain juga hapus
+  dropsDB.get(String(id)).put({ expiresAt: Date.now() - 1 });
   updateStats(); updateCounts(); updateTopEmotes();
 }
 
